@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2021  Ian
+ * Copyright (C) 2021  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,10 +29,10 @@
 
 public Plugin myinfo = {
 	name = "Simple Scramble",
-	author = "Ian",
+	author = "BitsE9",
 	description = "Very simple scramble functionality for TF2 Classic",
-	version = "1.2.3",
-	url = "https://github.com/IanE9/simple-scramble"
+	version = "1.2.4",
+	url = "https://github.com/BitsE9/simple-scramble"
 };
 
 #include "simplescramble/defs.sp"

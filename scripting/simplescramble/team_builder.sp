@@ -246,7 +246,7 @@ static ArrayList createIndicesArray(int maxIndex, int extraBlocks = 0) {
 }*/
 
 /**
- * Builds teams by shuffling.
+ * Builds teams using the given scramble method.
  *
  * @param scrambleMethod    Scramble method to use to build teams.
  * @param clients           Array of clients that we're building teams for.
