@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -203,17 +203,17 @@ void AutoScrambleTeamFrag(int team) {
 void LogDebugAutoScrambleTeamStats() {
 	DebugLog("Last round won by team %d with a win streak of %d", s_LastRoundWinTeam, s_LastRoundWinTeamConsecutive);
 
-	int teamCount = GetPlayTeamCount();
-	for (int i = 0; i < teamCount; ++i) {
+	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
 		DebugLog("Team %d has %d frags so far", i, s_TeamFrags[i]);
 	}
 }
 
 void AutoScrambleSwitchedTeams() {
+	// FIXME - This is busted; Team mask needs to be considered.
 	int teamCount = GetPlayTeamCount();
 
 	// Teams are cylically rotated to the right when switched.
-
+	
 	if (s_LastRoundWinTeam != -1) {
 		if (++s_LastRoundWinTeam >= teamCount) {
 			s_LastRoundWinTeam = 0;
@@ -290,6 +290,7 @@ AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 	// Check if there are enough clients to scramble.
 	int clientCount = 0;
 	int teamCount = GetPlayTeamCount();
+	int teamMask = GetPlayTeamActiveMask();
 	for (int i = 1; i <= MaxClients; ++i) {
 		if (IsClientInGame(i) && ShouldScrambleClient(i)) {
 			++clientCount;
@@ -324,8 +325,8 @@ AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 	if (s_FragRatio > 0.0) {
 		int winningTeamFrags = s_TeamFrags[winningTeamIdx];
 		int otherTeamFrags = 0;
-		for (int i = 0; i < teamCount; ++i) {
-			if (i == winningTeamIdx) {
+		for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
+			if (i == winningTeamIdx || (teamMask & (1 << i)) == 0) {
 				continue;
 			}
 

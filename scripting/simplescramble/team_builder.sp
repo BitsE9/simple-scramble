@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ static int countTeamUnassignedBuddies(int team, int clients[MAXPLAYERS], int cli
  * @param clientCount        Number of clients in the clients array.
  * @param teamSizes          Array containing the team sizes.
  * @param teamScores         Array containing the team scores.
- * @param teamCount          The number of teams.
+ * @param teamMask           The mask of teams.
  * @param teamMaxSizeDiff    The maximium size difference between teams.
  * @return                   The number of candidate teams.
  */
@@ -62,12 +62,16 @@ static int collectScrambleCandidateTeams(
 	int clientCount,
 	int teamSizes[TEAM_MAX_PLAY],
 	int teamScores[TEAM_MAX_PLAY],
-	int teamCount,
+	int teamMask,
 	int teamMaxSizeDiff
 ) {
 	// First find the smallest team.
 	int minTeamSize = INT_MAX;
-	for (int teamIdx = 0; teamIdx < teamCount; ++teamIdx) {
+	for (int teamIdx = 0; teamIdx < TEAM_MAX_PLAY; ++teamIdx) {
+		if (teamMask & (1 << teamIdx) == 0) {
+			continue;
+		}
+		
 		int teamSize = teamSizes[teamIdx];
 		if (teamSize < minTeamSize) {
 			minTeamSize = teamSize;
@@ -78,7 +82,11 @@ static int collectScrambleCandidateTeams(
 	int candidateTeamCount = 0;
 	int maxTeamUnassignedBuddies = 0;
 	int minTeamScore = INT_MAX;
-	for (int teamIdx = 0; teamIdx < teamCount; ++teamIdx) {
+	for (int teamIdx = 0; teamIdx < TEAM_MAX_PLAY; ++teamIdx) {
+		if (teamMask & (1 << teamIdx) == 0) {
+			continue;
+		}
+		
 		int teamSize = teamSizes[teamIdx];
 		if (IsTeamEscorting(teamIdx + TEAM_FIRST_PLAY)) {
 			// Teams that are escorting a VIP logically behave as if they have 1 less player.
@@ -253,9 +261,11 @@ static ArrayList createIndicesArray(int maxIndex, int extraBlocks = 0) {
  * @param clientTeams       Array of client teams mapped to the clients array will be output to this array.
  * @param clientCount       Number of clients in the clients array.
  * @param teamCount         Number of teams to build.
+ * @param teamMask          Mask of teams to build.
+ * @param teamMaxSizeDiff   Maximum difference between team sizes.
  * @noreturn
  */
-void BuildScrambleTeams(ScrambleMethod scrambleMethod, int clients[MAXPLAYERS], int clientTeams[MAXPLAYERS], int clientCount, int teamCount, int teamMaxSizeDiff) {
+void BuildScrambleTeams(ScrambleMethod scrambleMethod, int clients[MAXPLAYERS], int clientTeams[MAXPLAYERS], int clientCount, int teamCount, int teamMask, int teamMaxSizeDiff) {
 	if (g_DebugLog) {
 		DebugLog("BuildScrambleTeams scrambleMethod=%d", scrambleMethod);
 	}
@@ -274,7 +284,7 @@ void BuildScrambleTeams(ScrambleMethod scrambleMethod, int clients[MAXPLAYERS], 
 	}
 
 	// Build array of unassgined clients.
-	ArrayList unassignedClients = unassignedClients = createIndicesArray(clientCount);
+	ArrayList unassignedClients = createIndicesArray(clientCount);
 	
 	int teamSizes[TEAM_MAX_PLAY] = {0, ...};
 	int teamScores[TEAM_MAX_PLAY] = {0, ...};
@@ -290,7 +300,7 @@ void BuildScrambleTeams(ScrambleMethod scrambleMethod, int clients[MAXPLAYERS], 
 			clientCount,
 			teamSizes,
 			teamScores,
-			teamCount,
+			teamMask,
 			teamMaxSizeDiff
 		);
 		int candidateTeamIdx = GetRandomInt(0, candidateTeamCount - 1);

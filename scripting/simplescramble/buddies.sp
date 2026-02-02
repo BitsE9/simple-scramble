@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -93,7 +93,7 @@ static void showAddBuddyMenu(int client) {
 	menu.Display(client, MENU_TIME_FOREVER);
 }
 
-int addBuddyMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
+void addBuddyMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
 	switch (action) {
 		case MenuAction_Select:
 		{

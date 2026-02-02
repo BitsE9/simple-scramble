@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -114,10 +114,34 @@ void RespawnPickups() {
 }
 
 /**
+ * @return the mask of playable teams.
+ */
+int GetPlayTeamActiveMask() {
+	return GameRules_GetProp("m_iTeamsActive");
+}
+
+/**
+ * Check if the given team is active.
+ *
+ * @param team    Index of the team to check.
+ * @return        true if the team is active.
+ */
+bool IsPlayTeamActive(int team) {
+	return GetPlayTeamActiveMask() & (1 << (team - TEAM_FIRST_PLAY)) != 0;
+}
+
+/**
  * @return the number of playable teams.
  */
 int GetPlayTeamCount() {
-	return GameRules_GetProp("m_bFourTeamMode") ? 4 : 2;
+	int mask = GetPlayTeamActiveMask();
+	int count = 0;
+	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
+		if ((mask & (1 << i)) != 0) {
+			++count;
+		}
+	}
+	return count;
 }
 
 /**
@@ -127,7 +151,7 @@ int GetPlayTeamCount() {
  * @return        true if the team is escorting a VIP.
  */
 bool IsTeamEscorting(int team) {
-	return GetEntProp(GetTeamEntity(team), Prop_Send, "m_bEscorting") ? true : false;
+	return GetEntProp(GetTeamEntity(team), Prop_Send, "m_bEscortingVIP") ? true : false;
 }
 
 /**
@@ -172,7 +196,7 @@ void ChangeClientTeamRespawn(int client, int team) {
 		SetEntProp(client, Prop_Send, "m_lifeState", 2);
 	}
 	ChangeClientTeam(client, team);
-	TF2_RespawnPlayer(client);
+	SS_RespawnPlayer(client);
 }
 
 /**
@@ -446,4 +470,24 @@ void SS_ReplyToCommand(int client, const char[] format, any ...)
 		RemoveColorCodes(buffer, sizeof(buffer), buffer, sizeof(buffer));
 		PrintToConsole(client, "%s", buffer);
 	}
+}
+
+/**
+ * Respawns a player.
+ *
+ * @noreturn
+ */
+void SS_RespawnPlayer(int client) {
+	SDKCall(g_SDKCall_ForceRespawn, client);
+}
+
+int SS_GetPlayerClass(int client)
+{
+	return GetEntProp(client, Prop_Send, "m_iClass");
+}
+
+void SS_SetPlayerClass(int client, int classType)
+{
+	SetEntProp(client, Prop_Send, "m_iClass", classType);
+	SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", classType);
 }

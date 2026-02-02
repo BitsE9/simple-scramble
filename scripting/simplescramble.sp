@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
 #include <sdktools>
 #include <profiler>
 
-#include <tf2c>
 #include <hlxce-sm-api>
 #include <dhooks>
 
@@ -30,8 +29,8 @@
 public Plugin myinfo = {
 	name = "Simple Scramble",
 	author = "BitsE9",
-	description = "Very simple scramble functionality for TF2 Classic",
-	version = "1.2.4",
+	description = "Very simple scramble functionality for TF2 Classified",
+	version = "2.0.0",
 	url = "https://github.com/BitsE9/simple-scramble"
 };
 
@@ -61,6 +60,7 @@ enum DatabaseKind {
 	DatabaseKind_HLXCE,
 }
 
+Handle g_SDKCall_ForceRespawn;
 Handle g_SDKCall_RemoveAllOwnedEntitiesFromWorld;
 DynamicHook g_Hook_GameRules_ShouldScramble;
 
@@ -119,13 +119,20 @@ public void OnPluginStart() {
 	if (!gameconf) {
 		SetFailState("GameData \"simplescramble.txt\" does not exist.");
 	}
+	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(gameconf, SDKConf_Virtual, "CBasePlayer::ForceRespawn");
+	g_SDKCall_ForceRespawn = EndPrepSDKCall();
+	if (g_SDKCall_ForceRespawn == null) {
+		SetFailState("Failed to create SDKCall for \"CBasePlayer::ForceRespawn\".");
+	}
 
 	StartPrepSDKCall(SDKCall_Player);
 	PrepSDKCall_SetFromConf(gameconf, SDKConf_Signature, "CTFPlayer::RemoveAllOwnedEntitiesFromWorld");
 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
 	g_SDKCall_RemoveAllOwnedEntitiesFromWorld = EndPrepSDKCall();
 	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld == null) {
-		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::g_SDKCall_RemoveAllOwnedEntitiesFromWorld\".");
+		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::RemoveAllOwnedEntitiesFromWorld\".");
 	}
 
 	g_Hook_GameRules_ShouldScramble = DynamicHook.FromConf(gameconf, "CTeamplayRules::ShouldScrambleTeams");
@@ -747,9 +754,9 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 		}
 		
 		// Client who have recently joined will sometimes have no class.
-		if (TF2_GetPlayerClass(client) == TFClass_Unknown) {
-			TFClassType randomClass = view_as<TFClassType>(GetRandomInt(1, 9));
-			TF2_SetPlayerClass(client, randomClass);
+		if (SS_GetPlayerClass(client) == 0) {
+			int randomClass = GetRandomInt(1, 9);
+			SS_SetPlayerClass(client, randomClass);
 		}
 
 		switch (respawnMode) {
@@ -774,7 +781,7 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 	} else {
 		if (respawnMode == RespawnMode_Reset) {
 			RemoveClientOwnedEntities(client);
-			TF2_RespawnPlayer(client);
+			SS_RespawnPlayer(client);
 		}
 		return false;
 	}
@@ -813,8 +820,12 @@ void PrintTeamStats(int client) {
 
 	char teamName[24];
 	char teamScoreRatioStr[64];
-	for (int i = 0; i < GetPlayTeamCount(); ++i) {
+	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
 		int team = i + TEAM_FIRST_PLAY;
+		if (!IsPlayTeamActive(team)) {
+			continue;
+		}
+		
 		GetTeamShortName(team, teamName, sizeof(teamName));
 		Format(teamName, sizeof(teamName), "\x07%06X%s\x07%06X", GetTeamColorCode(team), teamName, g_MessageInformationColorCode);
 
@@ -842,8 +853,12 @@ void PrintTeamStatsToAll() {
 	if (recipientCount != 0) {
 		char teamName[24];
 		char teamScoreRatioStr[64];
-		for (int i = 0; i < GetPlayTeamCount(); ++i) {
+		for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
 			int team = i + TEAM_FIRST_PLAY;
+			if (!IsPlayTeamActive(team)) {
+				continue;
+			}
+			
 			GetTeamShortName(team, teamName, sizeof(teamName));
 			Format(teamName, sizeof(teamName), "\x07%06X%s\x07%06X", GetTeamColorCode(team), teamName, g_MessageInformationColorCode);
 
@@ -912,11 +927,12 @@ void PerformScramble(RespawnMode respawnMode, bool notify = true) {
 	int clientTeams[MAXPLAYERS];
 	{
 		int teamCount = GetPlayTeamCount();
+		int teamMask = GetPlayTeamActiveMask();
 		int unbalanceLimit = g_TeamsUnbalanceLimit > 0 ? g_TeamsUnbalanceLimit : INT_MAX;
 		
 		Profiler prof = new Profiler();
 		prof.Start();
-		BuildScrambleTeams(g_ScrambleMethod, clients, clientTeams, clientCount, teamCount, unbalanceLimit);
+		BuildScrambleTeams(g_ScrambleMethod, clients, clientTeams, clientCount, teamCount, teamMask, unbalanceLimit);
 		prof.Stop();
 		LogMessage("Scramble built %d teams from %d clients in %f seconds", teamCount, clientCount, prof.Time);
 		delete prof;
