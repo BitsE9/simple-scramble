@@ -21,7 +21,6 @@
 #include <profiler>
 
 #include <hlxce-sm-api>
-#include <dhooks>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -62,7 +61,6 @@ enum DatabaseKind {
 
 Handle g_SDKCall_ForceRespawn;
 Handle g_SDKCall_RemoveAllOwnedEntitiesFromWorld;
-DynamicHook g_Hook_GameRules_ShouldScramble;
 
 static ConVar s_ConVar_ScrambleVoteEnabled;
 static ConVar s_ConVar_TeamsUnbalanceLimit;
@@ -133,11 +131,6 @@ public void OnPluginStart() {
 	g_SDKCall_RemoveAllOwnedEntitiesFromWorld = EndPrepSDKCall();
 	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld == null) {
 		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::RemoveAllOwnedEntitiesFromWorld\".");
-	}
-
-	g_Hook_GameRules_ShouldScramble = DynamicHook.FromConf(gameconf, "CTeamplayRules::ShouldScrambleTeams");
-	if (g_Hook_GameRules_ShouldScramble == null) {
-		SetFailState("Failed to create hook for \"CTeamplayRules::ShouldScrambleTeams\".");
 	}
 
 	delete gameconf;
@@ -291,10 +284,6 @@ public void OnPluginStart() {
 }
 
 public void OnMapStart() {
-	if (g_Hook_GameRules_ShouldScramble.HookGamerules(Hook_Pre, hook_GameRules_ShouldScramble) == INVALID_HOOK_ID) {
-		LogError("Failed to hook gamerules using \"g_Hook_GameRules_ShouldScramble\"");
-	}
-	
 	PrecacheScriptSound("Announcer.AM_TeamScrambleRandom");
 
 	AutoScrambleGameStart();
@@ -587,12 +576,6 @@ public void TF2_OnWaitingForPlayersStart() {
 	AutoScrambleReset();
 	g_RoundScrambleQueued = false;
 	g_ScrambleVoteScrambleTime = 0.0;
-}
-
-static MRESReturn hook_GameRules_ShouldScramble(DHookReturn hReturn) {
-	// We don't ever want vanilla scrambles to take place.
-	DHookSetReturn(hReturn, false);
-	return MRES_Supercede;
 }
 
 /**

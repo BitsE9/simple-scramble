@@ -4,10 +4,6 @@
 	{
 		"Offsets"
 		{
-			"CTeamplayRules::ShouldScrambleTeams"
-			{
-				"windows64"	"176"
-			}
 			"CBasePlayer::ForceRespawn"
 			{
 				"windows64"	"374"
