@@ -203,28 +203,77 @@ void AutoScrambleTeamFrag(int team) {
 void LogDebugAutoScrambleTeamStats() {
 	DebugLog("Last round won by team %d with a win streak of %d", s_LastRoundWinTeam, s_LastRoundWinTeamConsecutive);
 
+	int teamMask = GetPlayTeamActiveMask();
 	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
+		if ((teamMask & (1 << i)) == 0) {
+			continue;
+		}
 		DebugLog("Team %d has %d frags so far", i, s_TeamFrags[i]);
 	}
 }
 
 void AutoScrambleSwitchedTeams() {
-	// FIXME - This is busted; Team mask needs to be considered.
-	int teamCount = GetPlayTeamCount();
+	int teamMask = GetPlayTeamActiveMask();
 
-	// Teams are cylically rotated to the right when switched.
+	// Teams are cyclically rotated to the right when switched.
 	
-	if (s_LastRoundWinTeam != -1) {
-		if (++s_LastRoundWinTeam >= teamCount) {
-			s_LastRoundWinTeam = 0;
+	// Find the team bounds.
+	int teamFront = -1;
+	int teamBack = -1;
+	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
+		if ((teamMask & (1 << i)) != 0) {
+			if (teamFront == -1) {
+				teamFront = i;
+			}
+			teamBack = i;
 		}
 	}
-
-	int tempFrags = s_TeamFrags[teamCount - 1];
-	for (int i = teamCount - 1; i > 0; --i) {
-		s_TeamFrags[i] = s_TeamFrags[i - 1];
+	
+	//char teamName1[4];
+	//char teamName2[4];
+	
+	if (teamFront != teamBack) {
+		// Rotate the winning team.
+		if (s_LastRoundWinTeam != -1) {
+			int prevLastRoundWinTeam = s_LastRoundWinTeam;
+			if (++s_LastRoundWinTeam >= TEAM_MAX_PLAY) {
+				s_LastRoundWinTeam = 0;
+			}
+			while (s_LastRoundWinTeam != prevLastRoundWinTeam) {
+				if ((teamMask & (1 << s_LastRoundWinTeam)) != 0) {
+					break;
+				} else {
+					++s_LastRoundWinTeam;
+				}
+			}
+			//GetTeamShortName(prevLastRoundWinTeam + TEAM_FIRST_PLAY, teamName1, sizeof(teamName1));
+			//GetTeamShortName(s_LastRoundWinTeam + TEAM_FIRST_PLAY, teamName2, sizeof(teamName2));
+			//PrintToChatAll("Last winner changed from %s to %s", teamName1, teamName2);
+		}
+		
+		
+		// Store the back because it's going to get overwritten.
+		int teamBackFrags = s_TeamFrags[teamBack];
+		
+		// Loop backwards performing assignments until the front bound is hit.
+		int teamLhs = teamBack;
+		while (teamLhs > teamFront) {
+			int teamRhs = teamLhs - 1;
+			while ((teamMask & (1 << teamRhs)) == 0) {
+				--teamRhs;
+			}
+			
+			s_TeamFrags[teamLhs] = s_TeamFrags[teamRhs];
+			//GetTeamShortName(teamLhs + TEAM_FIRST_PLAY, teamName1, sizeof(teamName1));
+			//GetTeamShortName(teamRhs + TEAM_FIRST_PLAY, teamName2, sizeof(teamName2));
+			//PrintToChatAll("%s assigned %s's frags", teamName1, teamName2);
+			teamLhs = teamRhs;
+		}
+		s_TeamFrags[teamLhs] = teamBackFrags;
+		//GetTeamShortName(teamLhs + TEAM_FIRST_PLAY, teamName1, sizeof(teamName1));
+		//GetTeamShortName(teamBack + TEAM_FIRST_PLAY, teamName2, sizeof(teamName2));
+		//PrintToChatAll("%s assigned %s's frags", teamName1, teamName2);
 	}
-	s_TeamFrags[0] = tempFrags;
 
 	if (g_DebugLog) {
 		DebugLog("Team auto-scramble stats after team rotation:");
