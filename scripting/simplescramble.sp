@@ -60,7 +60,6 @@ enum DatabaseKind {
 }
 
 Handle g_SDKCall_ForceRespawn;
-Handle g_SDKCall_RemoveAllOwnedEntitiesFromWorld;
 
 static ConVar s_ConVar_ScrambleVoteEnabled;
 static ConVar s_ConVar_TeamsUnbalanceLimit;
@@ -125,15 +124,14 @@ public void OnPluginStart() {
 		SetFailState("Failed to create SDKCall for \"CBasePlayer::ForceRespawn\".");
 	}
 
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(gameconf, SDKConf_Signature, "CTFPlayer::RemoveAllOwnedEntitiesFromWorld");
-	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
-	g_SDKCall_RemoveAllOwnedEntitiesFromWorld = EndPrepSDKCall();
-	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld == null) {
-		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::RemoveAllOwnedEntitiesFromWorld\".");
-	}
-
 	delete gameconf;
+
+	// Disable vanilla auto-scramble since this plugin handles scrambling.
+	ConVar mp_scrambleteams_auto = FindConVar("mp_scrambleteams_auto");
+	if (mp_scrambleteams_auto != null) {
+		mp_scrambleteams_auto.IntValue = 0;
+		mp_scrambleteams_auto.AddChangeHook(conVarChanged_LockScrambleAuto);
+	}
 
 	PluginStartDebugSystem();
 	PluginStartScoringSystem();
@@ -339,6 +337,13 @@ static void conVarChanged_MessageSuccessColorCode(ConVar convar, const char[] ol
 
 static void conVarChanged_MessageFailureColorCode(ConVar convar, const char[] oldValue, const char[] newValue) {
 	g_MessageFailureColorCode = HexToInt(newValue);
+}
+
+static void conVarChanged_LockScrambleAuto(ConVar convar, const char[] oldValue, const char[] newValue) {
+	// Force mp_scrambleteams_auto to stay at 0 since this plugin handles scrambling.
+	if (StringToInt(newValue) != 0) {
+		convar.IntValue = 0;
+	}
 }
 
 static Action cmd_CallVote(int client, const char[] command, int argc) {
