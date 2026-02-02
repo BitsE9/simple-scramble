@@ -7,26 +7,7 @@
 			"CBasePlayer::ForceRespawn"
 			{
 				"windows64"	"374"
-			}
-		}
-		
-		"Signatures"
-		{
-			"CTFPlayer::RemoveAllOwnedEntitiesFromWorld"
-			{
-				"library"	"server"
-				"windows64"	"@?RemoveAllOwnedEntitiesFromWorld@CTFPlayer@@QEAAX_N@Z"
-			}
-		}
-		
-		"Functions"
-		{
-			"CTeamplayRules::ShouldScrambleTeams"
-			{
-				"offset"	"CTeamplayRules::ShouldScrambleTeams"
-				"hooktype"	"gamerules"
-				"return"	"bool"
-				"this"		"ignore"
+				"linux64"	"375"
 			}
 		}
 	}

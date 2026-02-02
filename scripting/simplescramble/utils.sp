@@ -81,13 +81,25 @@ void ResetSetupTimer() {
 }
 
 /**
- * Removes all of a client's owned entities.
+ * Removes all of a client's owned entities (buildings).
  *
- * @param explodeBuildings    Whether or not to explode the client's buildings.
  * @noreturn
  */
-void RemoveClientOwnedEntities(int client, bool explodeBuildings = false) {
-	SDKCall(g_SDKCall_RemoveAllOwnedEntitiesFromWorld, client, !explodeBuildings);
+void RemoveClientOwnedEntities(int client) {
+	static const char buildingClassnames[][] = {
+		"obj_sentrygun",
+		"obj_dispenser",
+		"obj_teleporter"
+	};
+
+	for (int i = 0; i < sizeof(buildingClassnames); i++) {
+		int entity = -1;
+		while ((entity = FindEntityByClassname(entity, buildingClassnames[i])) != -1) {
+			if (GetEntPropEnt(entity, Prop_Send, "m_hBuilder") == client) {
+				AcceptEntityInput(entity, "Kill");
+			}
+		}
+	}
 }
 
 static char s_PickupClassnames[][] = {
