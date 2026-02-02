@@ -359,11 +359,11 @@ static Action cmd_CallVote(int client, const char[] command, int argc) {
 static Action cmd_MpScrambleTeams(int client, const char[] command, int argc) {
 	if (client == 0) {
 		// mp_scrambleteams normally works by queuing a scramble and restarting the round.
-		// The scramble is already blocked by our hook, so we just queue a scramble here.
 		QueueRoundScramble();
 		notifyScramble();
 	}
-	return Plugin_Continue;
+	// We need to block the command because we don't have a hook blocking scrambles.
+	return Plugin_Handled;
 }
 
 static AdminScrambleOpts parseAdminScrambleOpt(char[] arg) {
