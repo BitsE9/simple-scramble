@@ -94,6 +94,7 @@ void ResetSetupTimer() {
 /**
  * Removes all of a client's owned entities.
  *
+ * @param explodeBuildings Whether or not to explode the client's buildings.
  * @noreturn
  */
 void RemoveClientOwnedEntities(int client, bool explodeBuildings = false) {
