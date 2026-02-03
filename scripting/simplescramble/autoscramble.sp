@@ -69,7 +69,7 @@ void PluginStartAutoScrambleSystem() {
 
 	s_ConVar_InitialRoundCooldown = CreateConVar(
 		"ss_autoscramble_initial_round_cooldown", "1",
-		"Auto-scramble can only after this many mini-rounds have been played since the game began.",
+		"Auto-scramble can only occur after this many mini-rounds have been played since the game began.",
 		_,
 		true, 0.0
 	);
