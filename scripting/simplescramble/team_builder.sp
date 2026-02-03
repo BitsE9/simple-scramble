@@ -68,7 +68,7 @@ static int collectScrambleCandidateTeams(
 	// First find the smallest team.
 	int minTeamSize = INT_MAX;
 	for (int teamIdx = 0; teamIdx < TEAM_MAX_PLAY; ++teamIdx) {
-		if (teamMask & (1 << teamIdx) == 0) {
+		if (!IsBitSet(teamMask, teamIdx)) {
 			continue;
 		}
 		
@@ -83,7 +83,7 @@ static int collectScrambleCandidateTeams(
 	int maxTeamUnassignedBuddies = 0;
 	int minTeamScore = INT_MAX;
 	for (int teamIdx = 0; teamIdx < TEAM_MAX_PLAY; ++teamIdx) {
-		if (teamMask & (1 << teamIdx) == 0) {
+		if (!IsBitSet(teamMask, teamIdx)) {
 			continue;
 		}
 		

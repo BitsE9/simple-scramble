@@ -2,12 +2,13 @@
 {
 	"tf2classified"
 	{
-		"Offsets"
+		"Signatures"
 		{
-			"CBasePlayer::ForceRespawn"
+			"CTFPlayer::RemoveAllOwnedEntitiesFromWorld"
 			{
-				"windows64"	"374"
-				"linux64"	"375"
+				"library"	"server"
+				"windows64"	"@?RemoveAllOwnedEntitiesFromWorld@CTFPlayer@@QEAAX_N@Z"
+				"linux64"	"@_ZN9CTFPlayer31RemoveAllOwnedEntitiesFromWorldEb"
 			}
 		}
 	}

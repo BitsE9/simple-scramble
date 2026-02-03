@@ -18,6 +18,8 @@
 
 #include <sourcemod>
 #include <sdktools>
+#include <tf2>
+#include <tf2_stocks>
 #include <profiler>
 
 #include <hlxce-sm-api>
@@ -54,12 +56,7 @@ enum RespawnMode {
 	RespawnMode_Reset,
 }
 
-enum DatabaseKind {
-	DatabaseKind_None,
-	DatabaseKind_HLXCE,
-}
-
-Handle g_SDKCall_ForceRespawn;
+Handle g_SDKCall_RemoveAllOwnedEntitiesFromWorld;
 
 static ConVar s_ConVar_ScrambleVoteEnabled;
 static ConVar s_ConVar_TeamsUnbalanceLimit;
@@ -118,10 +115,11 @@ public void OnPluginStart() {
 	}
 	
 	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(gameconf, SDKConf_Virtual, "CBasePlayer::ForceRespawn");
-	g_SDKCall_ForceRespawn = EndPrepSDKCall();
-	if (g_SDKCall_ForceRespawn == null) {
-		SetFailState("Failed to create SDKCall for \"CBasePlayer::ForceRespawn\".");
+	PrepSDKCall_SetFromConf(gameconf, SDKConf_Signature, "CTFPlayer::RemoveAllOwnedEntitiesFromWorld");
+	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
+	g_SDKCall_RemoveAllOwnedEntitiesFromWorld = EndPrepSDKCall();
+	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld == null) {
+		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::RemoveAllOwnedEntitiesFromWorld\".");
 	}
 
 	delete gameconf;
@@ -742,9 +740,9 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 		}
 		
 		// Client who have recently joined will sometimes have no class.
-		if (SS_GetPlayerClass(client) == 0) {
-			int randomClass = GetRandomInt(1, 9);
-			SS_SetPlayerClass(client, randomClass);
+		if (TF2_GetPlayerClass(client) == TFClass_Unknown) {
+			TFClassType randomClass = view_as<TFClassType>(GetRandomInt(1, 9));
+			TF2_SetPlayerClass(client, randomClass);
 		}
 
 		switch (respawnMode) {
@@ -769,7 +767,7 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 	} else {
 		if (respawnMode == RespawnMode_Reset) {
 			RemoveClientOwnedEntities(client);
-			SS_RespawnPlayer(client);
+			TF2_RespawnPlayer(client);
 		}
 		return false;
 	}

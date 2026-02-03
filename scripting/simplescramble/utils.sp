@@ -15,6 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+ 
+ /**
+ * Checks if a bit within a mask is set.
+ *
+ * @param mask    The mask to check.
+ * @param pos     The position of the bit within the mask.
+ * @return        true if the bit at the given position of the mask is set.
+ */
+bool IsBitSet(int mask, int pos) {
+	return (mask & (1 << pos)) != 0;
+}
 
 /**
  * @return true if the game is in the waiting for players phase.
@@ -81,25 +92,12 @@ void ResetSetupTimer() {
 }
 
 /**
- * Removes all of a client's owned entities (buildings).
+ * Removes all of a client's owned entities.
  *
  * @noreturn
  */
-void RemoveClientOwnedEntities(int client) {
-	static const char buildingClassnames[][] = {
-		"obj_sentrygun",
-		"obj_dispenser",
-		"obj_teleporter"
-	};
-
-	for (int i = 0; i < sizeof(buildingClassnames); i++) {
-		int entity = -1;
-		while ((entity = FindEntityByClassname(entity, buildingClassnames[i])) != -1) {
-			if (GetEntPropEnt(entity, Prop_Send, "m_hBuilder") == client) {
-				AcceptEntityInput(entity, "Kill");
-			}
-		}
-	}
+void RemoveClientOwnedEntities(int client, bool explodeBuildings = false) {
+	SDKCall(g_SDKCall_RemoveAllOwnedEntitiesFromWorld, client, explodeBuildings);
 }
 
 static char s_PickupClassnames[][] = {
@@ -139,7 +137,7 @@ int GetPlayTeamActiveMask() {
  * @return        true if the team is active.
  */
 bool IsPlayTeamActive(int team) {
-	return GetPlayTeamActiveMask() & (1 << (team - TEAM_FIRST_PLAY)) != 0;
+	return IsBitSet(GetPlayTeamActiveMask(), team - TEAM_FIRST_PLAY);
 }
 
 /**
@@ -149,7 +147,7 @@ int GetPlayTeamCount() {
 	int mask = GetPlayTeamActiveMask();
 	int count = 0;
 	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
-		if ((mask & (1 << i)) != 0) {
+		if (IsBitSet(mask, i)) {
 			++count;
 		}
 	}
@@ -208,7 +206,7 @@ void ChangeClientTeamRespawn(int client, int team) {
 		SetEntProp(client, Prop_Send, "m_lifeState", 2);
 	}
 	ChangeClientTeam(client, team);
-	SS_RespawnPlayer(client);
+	TF2_RespawnPlayer(client);
 }
 
 /**
@@ -482,24 +480,4 @@ void SS_ReplyToCommand(int client, const char[] format, any ...)
 		RemoveColorCodes(buffer, sizeof(buffer), buffer, sizeof(buffer));
 		PrintToConsole(client, "%s", buffer);
 	}
-}
-
-/**
- * Respawns a player.
- *
- * @noreturn
- */
-void SS_RespawnPlayer(int client) {
-	SDKCall(g_SDKCall_ForceRespawn, client);
-}
-
-int SS_GetPlayerClass(int client)
-{
-	return GetEntProp(client, Prop_Send, "m_iClass");
-}
-
-void SS_SetPlayerClass(int client, int classType)
-{
-	SetEntProp(client, Prop_Send, "m_iClass", classType);
-	SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", classType);
 }

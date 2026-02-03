@@ -205,7 +205,7 @@ void LogDebugAutoScrambleTeamStats() {
 
 	int teamMask = GetPlayTeamActiveMask();
 	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
-		if ((teamMask & (1 << i)) == 0) {
+		if (!IsBitSet(teamMask, i)) {
 			continue;
 		}
 		DebugLog("Team %d has %d frags so far", i, s_TeamFrags[i]);
@@ -217,20 +217,20 @@ void AutoScrambleSwitchedTeams() {
 
 	// Teams are cyclically rotated to the right when switched.
 	
+	//char teamName1[4];
+	//char teamName2[4];
+	
 	// Find the team bounds.
 	int teamFront = -1;
 	int teamBack = -1;
 	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
-		if ((teamMask & (1 << i)) != 0) {
+		if (IsBitSet(teamMask, i)) {
 			if (teamFront == -1) {
 				teamFront = i;
 			}
 			teamBack = i;
 		}
 	}
-	
-	//char teamName1[4];
-	//char teamName2[4];
 	
 	if (teamFront != teamBack) {
 		// Rotate the winning team.
@@ -240,7 +240,7 @@ void AutoScrambleSwitchedTeams() {
 				s_LastRoundWinTeam = 0;
 			}
 			while (s_LastRoundWinTeam != prevLastRoundWinTeam) {
-				if ((teamMask & (1 << s_LastRoundWinTeam)) != 0) {
+				if (IsBitSet(teamMask, s_LastRoundWinTeam)) {
 					break;
 				} else {
 					++s_LastRoundWinTeam;
@@ -259,7 +259,7 @@ void AutoScrambleSwitchedTeams() {
 		int teamLhs = teamBack;
 		while (teamLhs > teamFront) {
 			int teamRhs = teamLhs - 1;
-			while ((teamMask & (1 << teamRhs)) == 0) {
+			while (!IsBitSet(teamMask, teamRhs)) {
 				--teamRhs;
 			}
 			
@@ -375,7 +375,7 @@ AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 		int winningTeamFrags = s_TeamFrags[winningTeamIdx];
 		int otherTeamFrags = 0;
 		for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
-			if (i == winningTeamIdx || (teamMask & (1 << i)) == 0) {
+			if (i == winningTeamIdx || !IsBitSet(teamMask, i)) {
 				continue;
 			}
 
