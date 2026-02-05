@@ -171,9 +171,9 @@ bool IsTeamEscorting(int team) {
  * @param team    Index of the team to get the VIP of.
  * @return        Client index of the team's VIP or 0 if none.
  */
-/*int GetTeamVIP(int team) {
+int GetTeamVIP(int team) {
 	return GetEntProp(GetTeamEntity(team), Prop_Send, "m_iVIP");
-}*/
+}
 
 /**
  * Get a client's medigun.

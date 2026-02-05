@@ -559,8 +559,8 @@ static Action event_RoundWin_Post(Event event, const char[] name, bool dontBroad
 static Action event_VipAssigned_Post(Event event, const char[] name, bool dontBroadcast){
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	int team = event.GetInt("team");
-	int oldVip = GetTeamVIP(team);
-	SetTeamVIP(team, client);
+	int oldVip = g_TeamVips[team-2];
+	g_TeamVips[team-2] = GetTeamVIP(team);
 	if(g_DebugLog){
 		DebugLog("VIP for team %d changed from %d to %d", team, oldVip, client);
 	}
