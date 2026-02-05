@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,11 +18,11 @@
 
 #include <sourcemod>
 #include <sdktools>
+#include <tf2>
+#include <tf2_stocks>
 #include <profiler>
 
-#include <tf2c>
 #include <hlxce-sm-api>
-#include <dhooks>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -30,8 +30,8 @@
 public Plugin myinfo = {
 	name = "Simple Scramble",
 	author = "BitsE9",
-	description = "Very simple scramble functionality for TF2 Classic",
-	version = "1.2.4",
+	description = "Very simple scramble functionality for TF2 Classified",
+	version = "2.0.0",
 	url = "https://github.com/BitsE9/simple-scramble"
 };
 
@@ -56,13 +56,7 @@ enum RespawnMode {
 	RespawnMode_Reset,
 }
 
-enum DatabaseKind {
-	DatabaseKind_None,
-	DatabaseKind_HLXCE,
-}
-
 Handle g_SDKCall_RemoveAllOwnedEntitiesFromWorld;
-DynamicHook g_Hook_GameRules_ShouldScramble;
 
 static ConVar s_ConVar_ScrambleVoteEnabled;
 static ConVar s_ConVar_TeamsUnbalanceLimit;
@@ -132,21 +126,23 @@ public void OnPluginStart() {
 	if (!gameconf) {
 		SetFailState("GameData \"smartscramble.txt\" does not exist.");
 	}
-
+	
 	StartPrepSDKCall(SDKCall_Player);
 	PrepSDKCall_SetFromConf(gameconf, SDKConf_Signature, "CTFPlayer::RemoveAllOwnedEntitiesFromWorld");
 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
 	g_SDKCall_RemoveAllOwnedEntitiesFromWorld = EndPrepSDKCall();
 	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld == null) {
-		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::g_SDKCall_RemoveAllOwnedEntitiesFromWorld\".");
-	}
-
-	g_Hook_GameRules_ShouldScramble = DynamicHook.FromConf(gameconf, "CTeamplayRules::ShouldScrambleTeams");
-	if (g_Hook_GameRules_ShouldScramble == null) {
-		SetFailState("Failed to create hook for \"CTeamplayRules::ShouldScrambleTeams\".");
+		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::RemoveAllOwnedEntitiesFromWorld\".");
 	}
 
 	delete gameconf;
+
+	// Disable vanilla auto-scramble since this plugin handles scrambling.
+	ConVar mp_scrambleteams_auto = FindConVar("mp_scrambleteams_auto");
+	if (mp_scrambleteams_auto != null) {
+		mp_scrambleteams_auto.IntValue = 0;
+		mp_scrambleteams_auto.AddChangeHook(conVarChanged_LockScrambleAuto);
+	}
 
 	PluginStartDebugSystem();
 	PluginStartScoringSystem();
@@ -308,10 +304,6 @@ public void OnPluginStart() {
 }
 
 public void OnMapStart() {
-	if (g_Hook_GameRules_ShouldScramble.HookGamerules(Hook_Pre, hook_GameRules_ShouldScramble) == INVALID_HOOK_ID) {
-		LogError("Failed to hook gamerules using \"g_Hook_GameRules_ShouldScramble\"");
-	}
-
 	PrecacheScriptSound("Announcer.AM_TeamScrambleRandom");
 
 	AutoScrambleGameStart();
@@ -374,6 +366,13 @@ static void conVarChanged_MessageFailureColorCode(ConVar convar, const char[] ol
 	g_MessageFailureColorCode = HexToInt(newValue);
 }
 
+static void conVarChanged_LockScrambleAuto(ConVar convar, const char[] oldValue, const char[] newValue) {
+	// Force mp_scrambleteams_auto to stay at 0 since this plugin handles scrambling.
+	if (StringToInt(newValue) != 0) {
+		convar.IntValue = 0;
+	}
+}
+
 static Action cmd_CallVote(int client, const char[] command, int argc) {
 	if (argc >= 1) {
 		char voteType[16];
@@ -392,11 +391,11 @@ static Action cmd_CallVote(int client, const char[] command, int argc) {
 static Action cmd_MpScrambleTeams(int client, const char[] command, int argc) {
 	if (client == 0) {
 		// mp_scrambleteams normally works by queuing a scramble and restarting the round.
-		// The scramble is already blocked by our hook, so we just queue a scramble here.
 		QueueRoundScramble();
 		notifyScramble();
 	}
-	return Plugin_Continue;
+	// We need to block the command because we don't have a hook blocking scrambles.
+	return Plugin_Handled;
 }
 
 static AdminScrambleOpts parseAdminScrambleOpt(char[] arg) {
@@ -700,12 +699,6 @@ void MapStartScramble(){
 	}
 }
 
-static MRESReturn hook_GameRules_ShouldScramble(DHookReturn hReturn) {
-	// We don't ever want vanilla scrambles to take place.
-	DHookSetReturn(hReturn, false);
-	return MRES_Supercede;
-}
-
 /**
  * Retrieves the number of seconds that a given client has been on their current team.
  */
@@ -987,8 +980,12 @@ void PrintTeamStats(int client) {
 
 	char teamName[24];
 	char teamScoreRatioStr[64];
-	for (int i = 0; i < GetPlayTeamCount(); ++i) {
+	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
 		int team = i + TEAM_FIRST_PLAY;
+		if (!IsPlayTeamActive(team)) {
+			continue;
+		}
+		
 		GetTeamShortName(team, teamName, sizeof(teamName));
 		Format(teamName, sizeof(teamName), "\x07%06X%s\x07%06X", GetTeamColorCode(team), teamName, g_MessageInformationColorCode);
 
@@ -1016,8 +1013,12 @@ void PrintTeamStatsToAll() {
 	if (recipientCount != 0) {
 		char teamName[24];
 		char teamScoreRatioStr[64];
-		for (int i = 0; i < GetPlayTeamCount(); ++i) {
+		for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
 			int team = i + TEAM_FIRST_PLAY;
+			if (!IsPlayTeamActive(team)) {
+				continue;
+			}
+			
 			GetTeamShortName(team, teamName, sizeof(teamName));
 			Format(teamName, sizeof(teamName), "\x07%06X%s\x07%06X", GetTeamColorCode(team), teamName, g_MessageInformationColorCode);
 
@@ -1086,11 +1087,12 @@ void PerformScramble(RespawnMode respawnMode, bool notify = true) {
 	int clientTeams[MAXPLAYERS];
 	{
 		int teamCount = GetPlayTeamCount();
+		int teamMask = GetPlayTeamActiveMask();
 		int unbalanceLimit = g_TeamsUnbalanceLimit > 0 ? g_TeamsUnbalanceLimit : INT_MAX;
 
 		Profiler prof = new Profiler();
 		prof.Start();
-		BuildScrambleTeams(g_ScrambleMethod, clients, clientTeams, clientCount, teamCount, unbalanceLimit);
+		BuildScrambleTeams(g_ScrambleMethod, clients, clientTeams, clientCount, teamCount, teamMask, unbalanceLimit);
 		prof.Stop();
 		LogMessage("Scramble built %d teams from %d clients in %f seconds", teamCount, clientCount, prof.Time);
 		delete prof;

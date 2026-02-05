@@ -1,6 +1,6 @@
 /*
  * simple-scramble
- * Copyright (C) 2025  BitsE9
+ * Copyright (C) 2026  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,6 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+ 
+ /**
+ * Checks if a bit within a mask is set.
+ *
+ * @param mask    The mask to check.
+ * @param pos     The position of the bit within the mask.
+ * @return        true if the bit at the given position of the mask is set.
+ */
+bool IsBitSet(int mask, int pos) {
+	return (mask & (1 << pos)) != 0;
+}
 
 /**
  * @return true if the game is in the waiting for players phase.
@@ -83,11 +94,11 @@ void ResetSetupTimer() {
 /**
  * Removes all of a client's owned entities.
  *
- * @param explodeBuildings    Whether or not to explode the client's buildings.
+ * @param explodeBuildings Whether or not to explode the client's buildings.
  * @noreturn
  */
 void RemoveClientOwnedEntities(int client, bool explodeBuildings = false) {
-	SDKCall(g_SDKCall_RemoveAllOwnedEntitiesFromWorld, client, !explodeBuildings);
+	SDKCall(g_SDKCall_RemoveAllOwnedEntitiesFromWorld, client, explodeBuildings);
 }
 
 static char s_PickupClassnames[][] = {
@@ -114,10 +125,34 @@ void RespawnPickups() {
 }
 
 /**
+ * @return the mask of playable teams.
+ */
+int GetPlayTeamActiveMask() {
+	return GameRules_GetProp("m_iTeamsActive");
+}
+
+/**
+ * Check if the given team is active.
+ *
+ * @param team    Index of the team to check.
+ * @return        true if the team is active.
+ */
+bool IsPlayTeamActive(int team) {
+	return IsBitSet(GetPlayTeamActiveMask(), team - TEAM_FIRST_PLAY);
+}
+
+/**
  * @return the number of playable teams.
  */
 int GetPlayTeamCount() {
-	return GameRules_GetProp("m_bFourTeamMode") ? 4 : 2;
+	int mask = GetPlayTeamActiveMask();
+	int count = 0;
+	for (int i = 0; i < TEAM_MAX_PLAY; ++i) {
+		if (IsBitSet(mask, i)) {
+			++count;
+		}
+	}
+	return count;
 }
 
 /**
@@ -127,7 +162,7 @@ int GetPlayTeamCount() {
  * @return        true if the team is escorting a VIP.
  */
 bool IsTeamEscorting(int team) {
-	return GetEntProp(GetTeamEntity(team), Prop_Send, "m_bEscorting") ? true : false;
+	return GetEntProp(GetTeamEntity(team), Prop_Send, "m_bEscortingVIP") ? true : false;
 }
 
 /**
