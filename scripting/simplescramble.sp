@@ -119,7 +119,7 @@ public void OnPluginStart() {
 	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);
 	g_SDKCall_RemoveAllOwnedEntitiesFromWorld = EndPrepSDKCall();
 	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld == null) {
-		SetFailState("Failed to create SDKCall for \"CTeamplayRoundBasedRules::RemoveAllOwnedEntitiesFromWorld\".");
+		LogMessage("[SimpleScramble] SDKCall for RemoveAllOwnedEntitiesFromWorld unavailable - using fallback method");
 	}
 
 	delete gameconf;
