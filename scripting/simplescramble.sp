@@ -29,13 +29,13 @@
 
 public Plugin myinfo = {
 	name = "Simple Scramble",
-	author = "BitsE9",
+	author = "BitsE9, Jaws",
 	description = "Very simple scramble functionality for TF2 Classified",
-	version = "2.0.0",
+	version = "2.1.0",
 	url = "https://github.com/BitsE9/simple-scramble"
 };
 
-#include "smartscramble/defs.sp"
+#include "simplescramble/defs.sp"
 
 enum ScrambleMethod {
 	ScrambleMethod_Shuffle = 0,
@@ -109,22 +109,22 @@ bool g_MapStartScramble = false;
 
 bool g_HLCEApiAvailable = false;
 
-#include "smartscramble/debug.sp"
-#include "smartscramble/utils.sp"
-#include "smartscramble/scoring.sp"
-#include "smartscramble/buddies.sp"
-#include "smartscramble/autoscramble.sp"
-#include "smartscramble/team_builder.sp"
+#include "simplescramble/debug.sp"
+#include "simplescramble/utils.sp"
+#include "simplescramble/scoring.sp"
+#include "simplescramble/buddies.sp"
+#include "simplescramble/autoscramble.sp"
+#include "simplescramble/team_builder.sp"
 
 public void OnPluginStart() {
 	g_LastMapUserIdScores = new StringMap();
 	PrintToServer("pootis");
 	LoadTranslations("common.phrases");
-	LoadTranslations("smartscramble.phrases");
+	LoadTranslations("simplescramble.phrases");
 
-	GameData gameconf = LoadGameConfigFile("smartscramble");
+	GameData gameconf = LoadGameConfigFile("simplescramble");
 	if (!gameconf) {
-		SetFailState("GameData \"smartscramble.txt\" does not exist.");
+		SetFailState("GameData \"simplescramble.txt\" does not exist.");
 	}
 	
 	StartPrepSDKCall(SDKCall_Player);
@@ -270,7 +270,7 @@ public void OnPluginStart() {
 		g_MessageFailureColorCode = HexToInt(buf, sizeof(buf));
 	}
 
-	AutoExecConfig(true, "smartscramble");
+	AutoExecConfig(true, "simplescramble");
 
 	// Commands
 	AddCommandListener(cmd_CallVote, "callvote");

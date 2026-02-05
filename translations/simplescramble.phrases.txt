@@ -80,6 +80,10 @@
 	{
 		"en"		"The frag ratio limit was reached."
 	}
+	"MapStartScramble"
+	{
+		"en"		"Scrambling - Teams are uneven based on last map's scores."
+	}
 	"ScrambleResult"
 	{
 		"#format"	"{1:d},{2:d},{3:s}"
