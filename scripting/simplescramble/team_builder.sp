@@ -1,6 +1,6 @@
 /*
- * smart-scramble
- * Copyright (C) 2024  Jaws
+ * simple-scramble
+ * Copyright (C) 2025  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -247,7 +247,7 @@ static ArrayList createIndicesArray(int maxIndex, int extraBlocks = 0) {
 }*/
 
 /**
- * Builds teams by shuffling.
+ * Builds teams using the given scramble method.
  *
  * @param scrambleMethod    Scramble method to use to build teams.
  * @param clients           Array of clients that we're building teams for.

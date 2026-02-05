@@ -1,6 +1,6 @@
 /*
- * smart-scramble
- * Copyright (C) 2024  Jaws
+ * simple-scramble
+ * Copyright (C) 2025  BitsE9
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,11 +28,11 @@
 #pragma newdecls required
 
 public Plugin myinfo = {
-	name = "Smart Scramble",
-	author = "Jaws, sbebular",
-	description = "Very simple scramble functionality for TF2 Classic, with extra points/time scoring mode",
-	version = "1.2",
-	url = "https://github.com/Jaws576/smart-scramble"
+	name = "Simple Scramble",
+	author = "BitsE9",
+	description = "Very simple scramble functionality for TF2 Classic",
+	version = "1.2.4",
+	url = "https://github.com/BitsE9/simple-scramble"
 };
 
 #include "smartscramble/defs.sp"
