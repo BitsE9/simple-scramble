@@ -1,6 +1,6 @@
 /*
- * simple-scramble
- * Copyright (C) 2021  Ian
+ * smart-scramble
+ * Copyright (C) 2024  Jaws
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
  * @param clientCount     Number of clients in the clients array.
  * @return                Number of unassigned buddies members of this team have.
  */
+ 
 static int countTeamUnassignedBuddies(int team, int clients[MAXPLAYERS], int clientTeams[MAXPLAYERS], int clientCount) {
 	int count = 0;
 	for (int i = 0; i < clientCount; ++i) {
@@ -268,13 +269,11 @@ void BuildScrambleTeams(ScrambleMethod scrambleMethod, int clients[MAXPLAYERS], 
 	// Score the clients
 	int clientScores[MAXPLAYERS] = {0, ...};
 	if (scrambleMethod != ScrambleMethod_Shuffle) {
-		for (int i = 0; i < clientCount; ++i) {
-			clientScores[i] = ScoreClient(clients[i]);
-		}
+		ScoreClients(clients, clientScores, clientCount);
 	}
 
 	// Build array of unassgined clients.
-	ArrayList unassignedClients = unassignedClients = createIndicesArray(clientCount);
+	ArrayList unassignedClients = createIndicesArray(clientCount);
 	
 	int teamSizes[TEAM_MAX_PLAY] = {0, ...};
 	int teamScores[TEAM_MAX_PLAY] = {0, ...};

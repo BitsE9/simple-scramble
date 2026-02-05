@@ -1,12 +1,12 @@
 /*
- * simple-scramble
- * Copyright (C) 2021  Ian
+ * smart-scramble
+ * Copyright (C) 2024  Jaws
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -28,14 +28,14 @@
 #pragma newdecls required
 
 public Plugin myinfo = {
-	name = "Simple Scramble",
-	author = "Ian",
-	description = "Very simple scramble functionality for TF2 Classic",
-	version = "1.2.3",
-	url = "https://github.com/IanE9/simple-scramble"
+	name = "Smart Scramble",
+	author = "Jaws, sbebular",
+	description = "Very simple scramble functionality for TF2 Classic, with extra points/time scoring mode",
+	version = "1.2",
+	url = "https://github.com/Jaws576/smart-scramble"
 };
 
-#include "simplescramble/defs.sp"
+#include "smartscramble/defs.sp"
 
 enum ScrambleMethod {
 	ScrambleMethod_Shuffle = 0,
@@ -73,6 +73,8 @@ static ConVar s_ConVar_ScrambleVoteRestartSetup;
 static ConVar s_ConVar_ScrambleVoteCooldown;
 static ConVar s_ConVar_TeamStatsAdminFlags;
 
+static ConVar s_ConVar_ScrambleOnLoadRatio;
+
 static ConVar s_ConVar_MessageNotificationColorCode;
 static ConVar s_ConVar_MessageInformationColorCode;
 static ConVar s_ConVar_MessageSuccessColorCode;
@@ -83,6 +85,7 @@ int g_TeamsUnbalanceLimit;
 ScrambleMethod g_ScrambleMethod;
 float g_SpecTimeout;
 float g_ScrambleVoteRatio;
+float g_ScrambleOnLoadRatio;
 bool g_ScrambleVoteRestartSetup;
 float g_ScrambleVoteCooldown;
 static int s_TeamStatsAdminFlags;
@@ -92,8 +95,15 @@ int g_MessageInformationColorCode;
 int g_MessageSuccessColorCode;
 int g_MessageFailureColorCode;
 
-float g_ClientTeamTime[MAXPLAYERS] = {0.0, ...};
+float g_ClientLastTime[MAXPLAYERS] = {0.0, ...}; //the GAME TIME (seconds since map start) at which the client last had their time updated
+float g_ClientPlayTime[MAXPLAYERS] = {0.0, ...}; //the time (in seconds) for which a player has been playing and their score updated
+int g_ClientLastScore[MAXPLAYERS] = {0, ...}; //the client's score the last time it was updated
+int g_ClientPlayScore[MAXPLAYERS] = {0, ...}; //the total score for a players while they have been tracked
+bool g_ClientIsTracking[MAXPLAYERS] = {false, ...};
 bool g_ClientScrambleVote[MAXPLAYERS] = {false, ...};
+
+int g_TeamVips[4] = {0, ...};
+static StringMap g_LastMapUserIdScores;
 
 int g_HumanClients = 0;
 int g_ScrambleVotes = 0;
@@ -101,23 +111,26 @@ float g_ScrambleVoteScrambleTime = 0.0;
 bool g_RoundScrambleQueued = false;
 bool g_ScrambleVotePassed = false;
 bool g_SuppressTeamSwitchMessage = false;
+bool g_MapStartScramble = false;
 
 bool g_HLCEApiAvailable = false;
 
-#include "simplescramble/debug.sp"
-#include "simplescramble/utils.sp"
-#include "simplescramble/scoring.sp"
-#include "simplescramble/buddies.sp"
-#include "simplescramble/autoscramble.sp"
-#include "simplescramble/team_builder.sp"
+#include "smartscramble/debug.sp"
+#include "smartscramble/utils.sp"
+#include "smartscramble/scoring.sp"
+#include "smartscramble/buddies.sp"
+#include "smartscramble/autoscramble.sp"
+#include "smartscramble/team_builder.sp"
 
 public void OnPluginStart() {
+	g_LastMapUserIdScores = new StringMap();
+	PrintToServer("pootis");
 	LoadTranslations("common.phrases");
-	LoadTranslations("simplescramble.phrases");
+	LoadTranslations("smartscramble.phrases");
 
-	GameData gameconf = LoadGameConfigFile("simplescramble");
+	GameData gameconf = LoadGameConfigFile("smartscramble");
 	if (!gameconf) {
-		SetFailState("GameData \"simplescramble.txt\" does not exist.");
+		SetFailState("GameData \"smartscramble.txt\" does not exist.");
 	}
 
 	StartPrepSDKCall(SDKCall_Player);
@@ -139,7 +152,7 @@ public void OnPluginStart() {
 	PluginStartScoringSystem();
 	PluginStartBuddySystem();
 	PluginStartAutoScrambleSystem();
-	
+
 	// ConVars
 	s_ConVar_ScrambleVoteEnabled = FindConVar("sv_vote_issue_scramble_teams_allowed");
 	s_ConVar_ScrambleVoteEnabled.AddChangeHook(conVarChanged_ScrambleVoteEnabled);
@@ -148,7 +161,7 @@ public void OnPluginStart() {
 	s_ConVar_TeamsUnbalanceLimit = FindConVar("mp_teams_unbalance_limit");
 	s_ConVar_TeamsUnbalanceLimit.AddChangeHook(conVarChanged_TeamsUnbalanceLimit);
 	g_TeamsUnbalanceLimit = s_ConVar_TeamsUnbalanceLimit.IntValue;
-	
+
 	s_ConVar_ScrambleMethod = CreateConVar(
 		"ss_scramble_method", "1",
 		"The method used to assign teams to players during a scramble.\n\t0 - Shuffle\n\t1 - Top to Weakest Team",
@@ -158,7 +171,7 @@ public void OnPluginStart() {
 	);
 	s_ConVar_ScrambleMethod.AddChangeHook(conVarChanged_ScrambleMethod);
 	g_ScrambleMethod = view_as<ScrambleMethod>(s_ConVar_ScrambleMethod.IntValue);
-	
+
 	s_ConVar_SpecTimeout = CreateConVar(
 		"ss_scramble_spec_timeout", "30",
 		"Players who have been spectating for longer than this many seconds will not participate in scrambles. Use a negative value to have spectators always participate.",
@@ -167,7 +180,7 @@ public void OnPluginStart() {
 	);
 	s_ConVar_SpecTimeout.AddChangeHook(conVarChanged_SpecTimeout);
 	g_SpecTimeout = s_ConVar_SpecTimeout.FloatValue;
-	
+
 	s_ConVar_ScrambleVoteRatio = CreateConVar(
 		"ss_scramble_vote_ratio", "0.6",
 		"The ratio of human players that must vote to scramble the teams for the vote to pass.",
@@ -177,6 +190,15 @@ public void OnPluginStart() {
 	);
 	s_ConVar_ScrambleVoteRatio.AddChangeHook(conVarChanged_ScrambleVoteRatio);
 	g_ScrambleVoteRatio = s_ConVar_ScrambleVoteRatio.FloatValue;
+
+	s_ConVar_ScrambleOnLoadRatio = CreateConVar(
+		"ss_map_start_scramble_ratio", "1.5",
+		"How many times above average (0.5) should a team's score ratio (sum team score / sum total score) be to scramble at the start of the map.\nThis is checked at the end of waiting for players using data from last map.",
+		_,
+		true, 1.0
+	);
+	s_ConVar_ScrambleOnLoadRatio.AddChangeHook(conVarChanged_ScrambleOnLoadRatio);
+	g_ScrambleOnLoadRatio = s_ConVar_ScrambleOnLoadRatio.FloatValue;
 
 	s_ConVar_ScrambleVoteRestartSetup = CreateConVar(
 		"ss_scramble_vote_restart_setup", "1",
@@ -251,9 +273,9 @@ public void OnPluginStart() {
 		s_ConVar_MessageFailureColorCode.GetString(buf, sizeof(buf));
 		g_MessageFailureColorCode = HexToInt(buf, sizeof(buf));
 	}
-	
-	AutoExecConfig(true, "simplescramble");
-	
+
+	AutoExecConfig(true, "smartscramble");
+
 	// Commands
 	AddCommandListener(cmd_CallVote, "callvote");
 	AddCommandListener(cmd_MpScrambleTeams, "mp_scrambleteams");
@@ -261,14 +283,16 @@ public void OnPluginStart() {
 	RegAdminCmd("sm_scrambleround", cmd_ScrambleRound, ADMFLAG_GENERIC | ADMFLAG_KICK, "Queues a scramble at the end of the round.");
 	RegConsoleCmd("sm_teamstats", cmd_TeamStats, "Prints team stats information.");
 	RegConsoleCmd("sm_votescramble", cmd_VoteScramble, "Vote to scramble the teams.");
-	
-	
+
+
 	// Events
 	HookEvent("player_team", event_PlayerTeam_Pre, EventHookMode_Pre);
 	HookEvent("player_death", event_PlayerDeath_Post, EventHookMode_Post);
 	HookEvent("teamplay_round_start", event_RoundStart_Post, EventHookMode_Post);
 	HookEvent("teamplay_round_win", event_RoundWin_Post, EventHookMode_Post);
-	
+	HookEvent("vip_assigned", event_VipAssigned_Post, EventHookMode_Post);
+
+
 	for (int i = 1; i <= MaxClients; ++i) {
 		if (IsClientConnected(i)) {
 			if (!IsFakeClient(i)) {
@@ -287,7 +311,7 @@ public void OnMapStart() {
 	if (g_Hook_GameRules_ShouldScramble.HookGamerules(Hook_Pre, hook_GameRules_ShouldScramble) == INVALID_HOOK_ID) {
 		LogError("Failed to hook gamerules using \"g_Hook_GameRules_ShouldScramble\"");
 	}
-	
+
 	PrecacheScriptSound("Announcer.AM_TeamScrambleRandom");
 
 	AutoScrambleGameStart();
@@ -295,6 +319,7 @@ public void OnMapStart() {
 	g_RoundScrambleQueued = false;
 	g_ScrambleVoteScrambleTime = 0.0;
 	g_ScrambleVotePassed = false;
+	g_MapStartScramble = true;
 }
 
 static void conVarChanged_ScrambleVoteEnabled(ConVar convar, const char[] oldValue, const char[] newValue) {
@@ -315,6 +340,10 @@ static void conVarChanged_SpecTimeout(ConVar convar, const char[] oldValue, cons
 
 static void conVarChanged_ScrambleVoteRatio(ConVar convar, const char[] oldValue, const char[] newValue) {
 	g_ScrambleVoteRatio = StringToFloat(newValue);
+}
+
+static void conVarChanged_ScrambleOnLoadRatio(ConVar convar, const char[] oldValue, const char[] newValue) {
+	g_ScrambleOnLoadRatio = StringToFloat(newValue);
 }
 
 static void conVarChanged_ScrambleVoteRestartSetup(ConVar convar, const char[] oldValue, const char[] newValue) {
@@ -422,7 +451,7 @@ static Action cmd_Scramble(int client, int args) {
 			PerformScramble(respawnMode);
 		}
 	}
-	
+
 	return Plugin_Handled;
 }
 
@@ -459,13 +488,20 @@ static Action event_PlayerTeam_Pre(Event event, const char[] name, bool dontBroa
 	int team = event.GetInt("team");
 	int oldTeam = event.GetInt("oldteam");
 	if (team != oldTeam) {
-		g_ClientTeamTime[client] = GetGameTime();
+		if (team == TEAM_SPECTATOR || team == TEAM_UNASSIGNED)
+		{
+			PauseClientScoring(client);
+		}
+		else
+		{
+			ResumeClientScoring(client);
+		}
 	}
-	
+
 	if (g_SuppressTeamSwitchMessage) {
 		event.SetBool("silent", true);
 	}
-	
+
 	return Plugin_Continue;
 }
 
@@ -488,7 +524,10 @@ static Action event_PlayerDeath_Post(Event event, const char[] name, bool dontBr
 
 static Action event_RoundStart_Post(Event event, const char[] name, bool dontBroadcast) {
 	if (!IsInWaitingForPlayers()) {
-		if (IsRoundScrambleQueued()) {
+		if(g_MapStartScramble){
+			MapStartScramble();
+		}
+		else if (IsRoundScrambleQueued()) {
 			RoundScramble();
 		} else if (SwitchedTeamsThisRound()) {
 			AutoScrambleSwitchedTeams();
@@ -518,19 +557,58 @@ static Action event_RoundWin_Post(Event event, const char[] name, bool dontBroad
 	return Plugin_Continue;
 }
 
+static Action event_VipAssigned_Post(Event event, const char[] name, bool dontBroadcast){
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	int team = event.GetInt("team");
+	int oldVip = GetTeamVIP(team);
+	SetTeamVIP(team, client);
+	if(g_DebugLog){
+		DebugLog("VIP for team %d changed from %d to %d", team, oldVip, client);
+	}
+	if(oldVip != 0 && IsClientConnected(oldVip)){
+		ResumeClientScoring(oldVip);
+	}
+	PauseClientScoring(client);
+	return Plugin_Continue;
+}
+
 void InitConnectedClient(int client) {
 	g_ClientScrambleVote[client] = false;
 	InitClientScore(client);
 }
 
 void InitInGameClient(int client) {
-	g_ClientTeamTime[client] = GetGameTime();
+	g_ClientLastTime[client] = GetGameTime();
 	InitClientBuddies(client);
+	int id = GetSteamAccountID(client, true);
+	if(id != 0){
+		char key[32];
+		IntToString(id, key, 32);
+		DebugLog("key is %s", key);
+		int playScore = 0;
+		float playTime = 0.0;
+		if(g_LastMapUserIdScores.ContainsKey(key)){
+			DataPack userdata;
+			g_LastMapUserIdScores.GetValue(key, userdata);
+			userdata.Reset();
+			playScore = userdata.ReadCell();
+			playTime = userdata.ReadFloat();
+			if(g_DebugLog){
+				DebugLog("Loaded %s: %d/%f", key, playScore, playTime);
+			}
+			CloseHandle(userdata);
+		}
+		SetClientScoring(client, playScore, playTime);
+	}
 }
 
 public void OnAllPluginsLoaded() {
 	g_HLCEApiAvailable = LibraryExists("hlxce-sm-api");
+	if(g_DebugLog){
+		DebugLog("OnAllPluginsLoaded \"%i\"", g_ConVar_ScoreMethod.IntValue);
+	}
 	InitScoreMethod(view_as<ScoreMethod>(g_ConVar_ScoreMethod.IntValue));
+	
 }
 
 public void OnLibraryAdded(const char[] name) {
@@ -564,6 +642,19 @@ public void OnClientConnected(int client) {
 }
 
 public void OnClientDisconnect(int client) {
+	PauseClientScoring(client);
+	int id = GetSteamAccountID(client, true);
+	if(id != 0){
+		DataPack userdata = new DataPack();
+		userdata.WriteCell(g_ClientPlayScore[client]);
+		userdata.WriteFloat(g_ClientPlayTime[client]);
+		char key[32];
+		IntToString(id, key, 32);
+		g_LastMapUserIdScores.SetValue(key, userdata);
+		if(g_DebugLog){
+			DebugLog("Saved %s: %d/%f", key, g_ClientPlayScore[client], g_ClientPlayTime[client]);
+		}
+	}
 	if (!IsFakeClient(client)) {
 		--g_HumanClients;
 		if (g_ClientScrambleVote[client]) {
@@ -582,6 +673,33 @@ public void TF2_OnWaitingForPlayersStart() {
 	g_ScrambleVoteScrambleTime = 0.0;
 }
 
+void MapStartScramble(){
+	g_MapStartScramble = false;
+
+	int sums[TEAM_MAX_PLAY];
+	float ratios[TEAM_MAX_PLAY];
+	ComputeTeamStats(sums, ratios);
+	float ratioThreshold = 1.0/GetPlayTeamCount() * g_ScrambleOnLoadRatio;
+	for (int i = 0; i < TEAM_MAX_PLAY; i++){
+		if(g_DebugLog){
+			DebugLog("Team %d has score %d and ratio %f. Compare to threshold %f", i+2, sums[i], ratios[i], ratioThreshold);
+		}
+		if(ratios[i] > ratioThreshold && ratios[i] < 1.0){ //if ratio is 1 for a team then we are dealing with invalid data for other teams
+			SS_PrintToChatAll(0, "\x07%06X%t", g_MessageNotificationColorCode, "MapStartScramble");
+			RoundScramble();
+			break;
+		}
+	}
+
+	if(g_DebugLog){
+		DebugLog("Resetting scores");
+	}
+	g_LastMapUserIdScores.Clear();
+	for (int i = 1; i <= MaxClients; ++i){
+		SetClientScoring(i, 0, 0.0);
+	}
+}
+
 static MRESReturn hook_GameRules_ShouldScramble(DHookReturn hReturn) {
 	// We don't ever want vanilla scrambles to take place.
 	DHookSetReturn(hReturn, false);
@@ -592,7 +710,7 @@ static MRESReturn hook_GameRules_ShouldScramble(DHookReturn hReturn) {
  * Retrieves the number of seconds that a given client has been on their current team.
  */
 float GetClientTimeOnTeam(int client) {
-	return GetGameTime() - g_ClientTeamTime[client];
+	return GetGameTime() - g_ClientLastTime[client];
 }
 
 static void notifyScramble() {
@@ -656,6 +774,10 @@ void HandleVoteScramble(int passingClient = 0) {
 }
 
 void CastVoteScramble(int client) {
+	//TEMP FIX TO REPORTED CRASHES POST 2.2
+	if (GetClientTeam(client) <= 1){
+		return;
+	}
 	if (!IsFakeClient(client)) {
 		if (IsRoundScrambleQueued()) {
 			SS_ReplyToCommand(client, "\x07%06X%t", g_MessageSuccessColorCode, "ScrambleRoundAlreadyQueued");
@@ -701,7 +823,7 @@ bool ShouldScrambleClient(int client) {
 	int team = GetClientTeam(client);
 	if (team == TEAM_UNASSIGNED) {
 		// Never try to scramble unassigned clients
-		return false; 
+		return false;
 	} else if (team == TEAM_SPECTATOR) {
 		if (IsFakeClient(client)) {
 			// Spectating bots are not to be scrambled.
@@ -738,6 +860,47 @@ enum struct ClientRetainInfo {
 	}
 }
 
+void PauseClientScoring(int client){
+	if(g_ClientIsTracking[client])
+	{
+		UpdateClientScoreTime(client);
+		g_ClientIsTracking[client] = false;
+		if (g_DebugLog) {
+			DebugLog("Paused time tracking for %d (%d/%f)", client, g_ClientPlayScore[client], g_ClientPlayTime[client]);
+		}
+	}
+}
+
+void ResumeClientScoring(int client){
+	if(!g_ClientIsTracking[client]){
+		UpdateClientScoreTime(client);
+		g_ClientIsTracking[client] = true;
+		if (g_DebugLog) {
+			DebugLog("Resumed time tracking for %d (%d/%f)", client, g_ClientPlayScore[client], g_ClientPlayTime[client]);
+		}
+	}
+}
+
+void SetClientScoring(int client, int score, float time){
+	UpdateClientScoreTime(client);
+	g_ClientPlayTime[client] = time;
+	g_ClientPlayScore[client] = score;
+	if (g_DebugLog) {
+		DebugLog("Set score/time of %d to %d/%f", client, score, time);
+	}
+}
+
+void UpdateClientScoreTime(int client){
+	int gameScore = GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iTotalScore", _, client);
+	float gameTime = GetGameTime(); 
+	if(g_ClientIsTracking[client]){
+		g_ClientPlayTime[client] += (gameTime - g_ClientLastTime[client]);
+		g_ClientPlayScore[client] += (gameScore - g_ClientLastScore[client]);
+	}
+	g_ClientLastTime[client] = gameTime;
+	g_ClientLastScore[client] = gameScore;
+}
+
 bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 	if (GetClientTeam(client) != team) {
 		if (g_DebugLog) {
@@ -745,7 +908,7 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 			GetTeamName(team, teamName, sizeof(teamName));
 			DebugLog("Moving %N to team %s", client, teamName);
 		}
-		
+
 		// Client who have recently joined will sometimes have no class.
 		if (TF2_GetPlayerClass(client) == TFClass_Unknown) {
 			TFClassType randomClass = view_as<TFClassType>(GetRandomInt(1, 9));
@@ -772,7 +935,7 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 		}
 		return true;
 	} else {
-		if (respawnMode == RespawnMode_Reset) {
+	if (respawnMode == RespawnMode_Reset) {
 			RemoveClientOwnedEntities(client);
 			TF2_RespawnPlayer(client);
 		}
@@ -782,14 +945,25 @@ bool MoveClientTeam(int client, int team, RespawnMode respawnMode) {
 
 int ComputeTeamStats(int sums[TEAM_MAX_PLAY], float ratios[TEAM_MAX_PLAY]) {
 	int sumTotal = 0;
+
+	int clients[MAXPLAYERS];
+	int clientCount = 0;
+
+	// Gather up the clients that we will be scoring.
 	for (int i = 1; i <= MaxClients; ++i) {
-		if (IsClientInGame(i)) {
-			int team = GetClientTeam(i);
-			if (team >= TEAM_FIRST_PLAY) {
-				int score = ScoreClientUnmodified(i);
-				sumTotal += score;
-				sums[team - TEAM_FIRST_PLAY] += score;
-			}
+		if (IsClientInGame(i) && ShouldScrambleClient(i)) {
+			clients[clientCount++] = i;
+		}
+	}
+	int clientScores[MAXPLAYERS];
+	ScoreClients(clients, clientScores, clientCount);
+
+	for (int i = 0; i < clientCount; ++i) {
+		int team = GetClientTeam(clients[i]);
+		if (team >= TEAM_FIRST_PLAY) {
+			int score = clientScores[i];
+			sumTotal += score;
+			sums[team - TEAM_FIRST_PLAY] += score;
 		}
 	}
 
@@ -883,12 +1057,12 @@ void PerformScramble(RespawnMode respawnMode, bool notify = true) {
 	if (g_DebugLog) {
 		DebugLog("Performing scramble - respawnMode=%d", respawnMode);
 	}
-	
+
 	EmitGameSoundToAll("Announcer.AM_TeamScrambleRandom");
 
 	// Reset auto scramble conditions.
 	AutoScrambleReset();
-	
+
 	// We scrambled now, so don't bother scrambling next round.
 	g_RoundScrambleQueued = false;
 	ResetScrambleVotes();
@@ -897,23 +1071,23 @@ void PerformScramble(RespawnMode respawnMode, bool notify = true) {
 		g_ScrambleVotePassed = false;
 		g_ScrambleVoteScrambleTime = GetGameTime();
 	}
-	
+
 	int clients[MAXPLAYERS];
 	int clientCount = 0;
-	
+
 	// Gather up the clients that we will be scrambling.
 	for (int i = 1; i <= MaxClients; ++i) {
 		if (IsClientInGame(i) && ShouldScrambleClient(i)) {
 			clients[clientCount++] = i;
 		}
 	}
-	
+
 	// Build the client teams.
 	int clientTeams[MAXPLAYERS];
 	{
 		int teamCount = GetPlayTeamCount();
 		int unbalanceLimit = g_TeamsUnbalanceLimit > 0 ? g_TeamsUnbalanceLimit : INT_MAX;
-		
+
 		Profiler prof = new Profiler();
 		prof.Start();
 		BuildScrambleTeams(g_ScrambleMethod, clients, clientTeams, clientCount, teamCount, unbalanceLimit);
@@ -937,13 +1111,13 @@ void PerformScramble(RespawnMode respawnMode, bool notify = true) {
 	if (notify) {
 		notifyScramble();
 	}
-	
+
 	// Display scramble statistics.
 	float movedRatio = clientCount > 0 ? float(movedCount) / clientCount : 1.0;
 	char movedPercentStr[12];
 	FormatRoundedFloat(movedPercentStr, sizeof(movedPercentStr), movedRatio * 100, 2);
 	Format(movedPercentStr, sizeof(movedPercentStr), "%s%%", movedPercentStr);
-	
+
 	SS_PrintToChatAll(0, "\x07%06X%t", g_MessageNotificationColorCode, "ScrambleResult", movedCount, clientCount, movedPercentStr);
 	PrintTeamStatsToAll();
 }
