@@ -8,7 +8,7 @@
 			{
 				"library"	"server"
 				"windows64"	"@?RemoveAllOwnedEntitiesFromWorld@CTFPlayer@@QEAAX_N@Z"
-				"linux64"	"_ZN9CTFPlayer31RemoveAllOwnedEntitiesFromWorldEb"
+				"linux64"	"@_ZN9CTFPlayer31RemoveAllOwnedEntitiesFromWorldEb"
 			}
 		}
 	}
