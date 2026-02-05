@@ -98,7 +98,24 @@ void ResetSetupTimer() {
  * @noreturn
  */
 void RemoveClientOwnedEntities(int client, bool explodeBuildings = false) {
-	SDKCall(g_SDKCall_RemoveAllOwnedEntitiesFromWorld, client, explodeBuildings);
+	// Try SDKCall first if available
+	if (g_SDKCall_RemoveAllOwnedEntitiesFromWorld != null) {
+		SDKCall(g_SDKCall_RemoveAllOwnedEntitiesFromWorld, client, explodeBuildings);
+		return;
+	}
+
+	// Fallback: manually remove engineer buildings
+	int entity = -1;
+	while ((entity = FindEntityByClassname(entity, "obj_*")) != -1) {
+		if (IsValidEntity(entity) && GetEntPropEnt(entity, Prop_Send, "m_hBuilder") == client) {
+			if (explodeBuildings) {
+				SetVariantInt(9999);
+				AcceptEntityInput(entity, "RemoveHealth");
+			} else {
+				AcceptEntityInput(entity, "Kill");
+			}
+		}
+	}
 }
 
 static char s_PickupClassnames[][] = {
