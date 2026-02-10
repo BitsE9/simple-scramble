@@ -124,19 +124,20 @@ public void OnPluginStart() {
 
 	delete gameconf;
 
-	// Disable vanilla auto-scramble since this plugin handles scrambling.
-	ConVar mp_scrambleteams_auto = FindConVar("mp_scrambleteams_auto");
-	if (mp_scrambleteams_auto != null) {
-		mp_scrambleteams_auto.IntValue = 0;
-		mp_scrambleteams_auto.AddChangeHook(conVarChanged_LockScrambleAuto);
-	}
-
 	PluginStartDebugSystem();
 	PluginStartScoringSystem();
 	PluginStartBuddySystem();
 	PluginStartAutoScrambleSystem();
 	
 	// ConVars
+	
+	// Disable vanilla auto-scramble since this plugin handles scrambling.
+	ConVar mp_scrambleteams_auto = FindConVar("mp_scrambleteams_auto");
+	if (mp_scrambleteams_auto != null) {
+		mp_scrambleteams_auto.IntValue = 0;
+		mp_scrambleteams_auto.AddChangeHook(conVarChanged_LockScrambleAuto);
+	}
+	
 	s_ConVar_ScrambleVoteEnabled = FindConVar("sv_vote_issue_scramble_teams_allowed");
 	s_ConVar_ScrambleVoteEnabled.AddChangeHook(conVarChanged_ScrambleVoteEnabled);
 	g_ScrambleVoteEnabled = s_ConVar_ScrambleVoteEnabled.BoolValue;
