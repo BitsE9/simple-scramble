@@ -97,7 +97,7 @@ bool g_ClientIsTracking[MAXPLAYERS] = {false, ...};
 bool g_ClientScrambleVote[MAXPLAYERS] = {false, ...};
 
 int g_TeamVips[4] = {0, ...};
-static StringMap g_LastMapUserIdScores;
+StringMap g_LastMapUserIdScores;
 
 int g_HumanClients = 0;
 int g_ScrambleVotes = 0;
@@ -670,33 +670,6 @@ public void TF2_OnWaitingForPlayersStart() {
 	AutoScrambleReset();
 	g_RoundScrambleQueued = false;
 	g_ScrambleVoteScrambleTime = 0.0;
-}
-
-void MapStartScramble(){
-	g_MapStartScramble = false;
-
-	int sums[TEAM_MAX_PLAY];
-	float ratios[TEAM_MAX_PLAY];
-	ComputeTeamStats(sums, ratios);
-	float ratioThreshold = 1.0/GetPlayTeamCount() * g_ScrambleOnLoadRatio;
-	for (int i = 0; i < TEAM_MAX_PLAY; i++){
-		if(g_DebugLog){
-			DebugLog("Team %d has score %d and ratio %f. Compare to threshold %f", i+2, sums[i], ratios[i], ratioThreshold);
-		}
-		if(ratios[i] > ratioThreshold && ratios[i] < 1.0){ //if ratio is 1 for a team then we are dealing with invalid data for other teams
-			SS_PrintToChatAll(0, "\x07%06X%t", g_MessageNotificationColorCode, "MapStartScramble");
-			RoundScramble();
-			break;
-		}
-	}
-
-	if(g_DebugLog){
-		DebugLog("Resetting scores");
-	}
-	g_LastMapUserIdScores.Clear();
-	for (int i = 1; i <= MaxClients; ++i){
-		SetClientScoring(i, 0, 0.0);
-	}
 }
 
 /**

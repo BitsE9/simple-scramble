@@ -327,6 +327,19 @@ static int countTeamDominations(int teamDominations[TEAM_MAX_PLAY]) {
 	return totalSum;
 }
 
+static bool enoughClientsForAutoScramble() {
+	int clientCount = 0;
+	int requiredClients = GetPlayTeamCount() + s_RequiredExtraPlayers;
+	for (int i = 1; i <= MaxClients; ++i) {
+		if (IsClientInGame(i) && ShouldScrambleClient(i)) {
+			if (++clientCount >= requiredClients) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 	// Only scramble if there was a winner.
 	int winningTeamIdx = -1;
@@ -337,16 +350,7 @@ AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 	}
 
 	// Check if there are enough clients to scramble.
-	int clientCount = 0;
-	int teamCount = GetPlayTeamCount();
-	int teamMask = GetPlayTeamActiveMask();
-	for (int i = 1; i <= MaxClients; ++i) {
-		if (IsClientInGame(i) && ShouldScrambleClient(i)) {
-			++clientCount;
-		}
-	}
-	
-	if (clientCount < teamCount + s_RequiredExtraPlayers) {
+	if (!enoughClientsForAutoScramble()) {
 		return AutoScrambleReason_None;
 	}
 
@@ -354,6 +358,9 @@ AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 	if (s_RoundWinStreak != 0 && s_LastRoundWinTeamConsecutive >= s_RoundWinStreak) {
 		return AutoScrambleReason_RoundWinStreak;
 	}
+	
+	int teamCount = GetPlayTeamCount();
+	int teamMask = GetPlayTeamActiveMask();
 
 	// Check the domination difference.
 	if (s_DominationLead != 0) {
@@ -395,4 +402,33 @@ AutoScrambleReason MaybeAutoScramble(int winningTeam) {
 	}
 
 	return AutoScrambleReason_None;
+}
+
+void MapStartScramble(){
+	g_MapStartScramble = false;
+
+	if (enoughClientsForAutoScramble()) {
+		int sums[TEAM_MAX_PLAY];
+		float ratios[TEAM_MAX_PLAY];
+		ComputeTeamStats(sums, ratios);
+		float ratioThreshold = 1.0/GetPlayTeamCount() * g_ScrambleOnLoadRatio;
+		for (int i = 0; i < TEAM_MAX_PLAY; i++){
+			if(g_DebugLog){
+				DebugLog("Team %d has score %d and ratio %f. Compare to threshold %f", i+2, sums[i], ratios[i], ratioThreshold);
+			}
+			if(ratios[i] > ratioThreshold && ratios[i] < 1.0){ //if ratio is 1 for a team then we are dealing with invalid data for other teams
+				SS_PrintToChatAll(0, "\x07%06X%t", g_MessageNotificationColorCode, "MapStartScramble");
+				RoundScramble();
+				break;
+			}
+		}
+	}
+
+	if(g_DebugLog){
+		DebugLog("Resetting scores");
+	}
+	g_LastMapUserIdScores.Clear();
+	for (int i = 1; i <= MaxClients; ++i){
+		SetClientScoring(i, 0, 0.0);
+	}
 }
